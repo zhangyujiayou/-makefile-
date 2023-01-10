@@ -1,0 +1,47 @@
+PHONY := __build	#定义假象目标				
+__build:			#声明Makefile.bulid中第一个目标，构建依赖条件在后面补充。
+
+
+obj-y :=			#清空变量obj-y：这个变量需要存放的是：需要由各种.c文件生成的.o 文件
+subdir-y :=			#清空变量subdir-y：这个变量需要存放的是：顶层目录下的子目录
+EXTRA_CFLAGS :=		#清空变量EXTRA_CFLAGS：这个变量存放的是针对于当前目录中的所有文件设置额外的编译选项
+
+include Makefile	#将顶层目录中的makefile文件包含进来	
+
+# obj-y := a.o b.o c/ d/
+# $(filter %/, $(obj-y))   : c/ d/
+# __subdir-y  : c d
+# subdir-y    : c d
+__subdir-y	:= $(patsubst %/,%,$(filter %/, $(obj-y)))
+subdir-y	+= $(__subdir-y)
+
+# c/built-in.o d/built-in.o
+subdir_objs := $(foreach f,$(subdir-y),$(f)/built-in.o)
+
+# a.o b.o
+cur_objs := $(filter-out %/, $(obj-y))
+dep_files := $(foreach f,$(cur_objs),.$(f).d)
+dep_files := $(wildcard $(dep_files))
+
+ifneq ($(dep_files),)
+  include $(dep_files)
+endif
+
+
+PHONY += $(subdir-y)
+
+
+__build : $(subdir-y) built-in.o
+
+$(subdir-y):
+	make -C $@ -f $(TOPDIR)/Makefile.build
+
+built-in.o : $(cur_objs) $(subdir_objs)
+	$(LD) -r -o $@ $^
+
+dep_file = .$@.d
+
+%.o : %.c
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(CFLAGS_$@) -Wp,-MD,$(dep_file) -c -o $@ $<
+	
+.PHONY : $(PHONY) 	#声明PHONY为假象变量
